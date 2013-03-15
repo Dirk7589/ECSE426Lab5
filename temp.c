@@ -36,32 +36,32 @@ float toDegreeC(uint16_t vSense)
 */
 void displayTemperature(float temperature){
     if(temperature < 30){
-        GPIOD->ODR =0;
+        GPIOD->BSRRH = GREEN_LED | ORANGE_LED | RED_LED | BLUE_LED;
         GPIOD->BSRRL = BLUE_LED;
     }
     
     temperature = (int)fmodf(temperature, 8);
     
     if( temperature == 0 || temperature == 7){
-        GPIOD->ODR =0;
+        GPIOD->BSRRH = GREEN_LED | ORANGE_LED | RED_LED | BLUE_LED;
         GPIOD->BSRRL = BLUE_LED; //Max value of 32
     }
     
     if( temperature == 2 || temperature == 1 ){
-        GPIOD->ODR = 0;
+        GPIOD->BSRRH = GREEN_LED | ORANGE_LED | RED_LED | BLUE_LED;
         GPIOD->BSRRL = BLUE_LED; //Max value of 34
         GPIOD->BSRRL = GREEN_LED;
     }
     
     if(temperature == 4 || temperature == 3 ){
-        GPIOD->ODR = 0;
+        GPIOD->BSRRH = GREEN_LED | ORANGE_LED | RED_LED | BLUE_LED;
         GPIOD->BSRRL = BLUE_LED; //Max value of 36
         GPIOD->BSRRL = GREEN_LED;
         GPIOD->BSRRL = ORANGE_LED;
     }
     
     if(temperature == 6 || temperature == 5 ){
-        GPIOD->ODR = 0;
+        GPIOD->BSRRH = GREEN_LED | ORANGE_LED | RED_LED | BLUE_LED;
         GPIOD->BSRRL = BLUE_LED; //Max value of 38
         GPIOD->BSRRL = GREEN_LED;
         GPIOD->BSRRL = ORANGE_LED;
