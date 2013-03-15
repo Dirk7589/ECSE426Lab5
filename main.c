@@ -20,15 +20,15 @@
 #include "common.h"
 
 /*Defines */
-#define DEBUG 1
+#define DEBUG 0
 #define MAX_COUNTER_VALUE 5; //Maximum value for the temperature sensor to sample at 20Hz
 #define USER_BTN 0x0001 /*!<Defines the bit location of the user button*/
 
 /*Global Variables*/
-uint8_t tapState = 1; /**<A varaible that represents the current tap state*/
-uint8_t sampleACCFlag = 0; /**<A flag variable for sampling, restricted to a value of 0 or 1*/
+static uint8_t tapState = 1; /**<A varaible that represents the current tap state*/
+uint8_t sampleACCFlag = 0x01; /**<A flag variable for sampling, restricted to a value of 0 or 1*/
 uint8_t sampleTempCounter = 0; /**<A counter variable for sampling the temperature sensor */
-int32_t sampleTempFlag = 0x0000;
+int32_t sampleTempFlag = 0x0001;
 uint8_t buttonState = 0; /**<A variable that represents the current state of the button*/
 uint8_t dmaFlag = 0; /**<A flag variable that represent the DMA flag*/
 
@@ -73,8 +73,8 @@ void temperatureThread(void const * argument);
 void accelerometerThread(void const * argument);
 
 //Thread structure for above thread
-osThreadDef(temperatureThread, osPriorityNormal, 1, 0);
-osThreadDef(accelerometerThread, osPriorityNormal, 1, 0);
+osThreadDef(temperatureThread, osPriorityNormal+1, 1, 0);
+osThreadDef(accelerometerThread, osPriorityNormal+1, 1, 0);
 osThreadId tThread; //Tempearture thread ID
 osThreadId aThread; //Accelerometer thread ID
 
@@ -113,7 +113,7 @@ void temperatureThread(void const *argument){
 	
 	while(1){		
 		//check sample flag. This ensures the proper 20Hz sampling rate
-		osSignalWait(sampleTempFlag, 0);
+		osSignalWait(sampleTempFlag, osWaitForever);
 			
 		ADC_SoftwareStartConv(ADC1); //Start conversion
 		
@@ -150,21 +150,21 @@ void accelerometerThread(void const * argument){
 	GPIO_ResetBits(GPIOE, (uint16_t)0x0008); //Lower CS line
 	//stream0 is rx, stream3 is tx
 
-    //DMA2_Stream0->M0AR = (uint32_t)rxptr;
-    DMA2_Stream0->NDTR = 7;
-    DMA2_Stream0->M0AR = (uint32_t)rx;
+	//DMA2_Stream0->M0AR = (uint32_t)rxptr;
+	DMA2_Stream0->NDTR = 7;
+	DMA2_Stream0->M0AR = (uint32_t)rx;
 
-    //DMA2_Stream3->M0AR = (uint32_t)txptr;
-    DMA2_Stream3->NDTR = 7;
-    DMA2_Stream3->M0AR = (uint32_t)tx;
+	//DMA2_Stream3->M0AR = (uint32_t)txptr;
+	DMA2_Stream3->NDTR = 7;
+	DMA2_Stream3->M0AR = (uint32_t)tx;
 	
-    DMA2_Stream3->CR |= DMA_SxCR_EN;
+  DMA2_Stream3->CR |= DMA_SxCR_EN;
 	DMA2_Stream0->CR |= DMA_SxCR_EN;
 
 	//Real-time processing of data
 	while(1){
 		
-		osSignalWait(sampleACCFlag, 0); //Wait to sample
+		osSignalWait(sampleACCFlag, osWaitForever ); //Wait to sample
         #if DEBUG
         LIS302DL_ReadACC(accValues);
         osSemaphoreWait(accId, osWaitForever); //Have exclusive access to temperature
@@ -265,7 +265,11 @@ void displayUI(void)
 						displayBoardMovement(acceleration, previousValues, accelerationTotals); //display the boards movement
 					break;
 				}
+			break;
+		default:
+			break;
 		}
+
 	}
 }
 
@@ -324,6 +328,8 @@ void DMA2_Stream0_IRQHandler(void)
     DMA_ClearFlag(DMA2_Stream3, DMA_FLAG_TCIF3);
     //DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);
     GPIO_SetBits(GPIOE, (uint16_t)0x0008);  //Raise CS Line
-    DMA2_Stream0->CR |= 0; //Disable DMA
-	DMA2_Stream3->CR |= 0;
+    //DMA2_Stream0->CR |= 0; //Disable DMA
+		//DMA2_Stream3->CR |= 0;
+		DMA_Cmd(DMA2_Stream0, DISABLE); /// RX
+    DMA_Cmd(DMA2_Stream3, DISABLE); /// TX
 }
