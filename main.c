@@ -20,7 +20,7 @@
 #include "common.h"
 
 /*Defines */
-#define DEBUG 1y
+#define DEBUG 1
 #define MAX_COUNTER_VALUE 5; //Maximum value for the temperature sensor to sample at 20Hz
 #define USER_BTN 0x0001 /*!<Defines the bit location of the user button*/
 
