@@ -23,7 +23,7 @@
 /*Defines */
 #define DEBUG 0
 #define LAB4 0
-#define MANUAL_FILTER 0
+#define MANUAL_FILTER 1
 #define MAX_COUNTER_VALUE 5; //Maximum value for the temperature sensor to sample at 20Hz
 #define USER_BTN 0x0001 /*!<Defines the bit location of the user button*/
 
@@ -254,26 +254,23 @@ void accelerometerThread(void const * argument){
 						#endif
 						
 						#if !MANUAL_FILTER
-						printf("old: %f", accCorrectedValues[0]);
+						
 						accCorrectedValues[0] = accCorrectedValues[0] / 10000;
 						arm_float_to_q15(&accCorrectedValues[0], &accXFixed, 1);
 						arm_fir_decimate_q15(&q15InstanceX, &accXFixed, &accXFixed, 10);
 						arm_q15_to_float(&accXFixed, &accCorrectedValues[0], 1);
-						printf("new: %f", accCorrectedValues[0]);
+						
 						accCorrectedValues[1] = accCorrectedValues[1] / 10000;
 						arm_float_to_q15(&accCorrectedValues[1], &accYFixed, 1);
 						
 						accCorrectedValues[2] = accCorrectedValues[2] / 10000;
 						arm_float_to_q15(&accCorrectedValues[2], &accZFixed, 1);
 						#endif
-						
 						#endif
-						
-						#if LAB4
             accCorrectedValues[0] = movingAverage(accCorrectedValues[0], &dataX);
             accCorrectedValues[1] = movingAverage(accCorrectedValues[1], &dataY);
             accCorrectedValues[2] = movingAverage(accCorrectedValues[2], &dataZ);
-            #endif
+            
 						
 						
             osSemaphoreRelease(accId); //Release exclusive access
