@@ -8,7 +8,7 @@
 
 /*Includes*/
 #include <stdint.h>
-#include "arm_math.h"
+#include <arm_math.h>
 #include "stm32f4xx.h"
 #include "cmsis_os.h"
 #include <stdio.h>
@@ -18,9 +18,12 @@
 #include "temp.h"
 #include "access.h"
 #include "common.h"
+#include "fir.h"
 
 /*Defines */
 #define DEBUG 0
+#define LAB4 0
+#define MANUAL_FILTER 0
 #define MAX_COUNTER_VALUE 5; //Maximum value for the temperature sensor to sample at 20Hz
 #define USER_BTN 0x0001 /*!<Defines the bit location of the user button*/
 
@@ -39,6 +42,17 @@ uint8_t rx[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; /**<Receive buffer f
 
 uint8_t const* txptr = &tx[0];
 uint8_t* rxptr = &rx[0];
+
+/*Global 3*/
+float32_t coeffPFloat[] = {
+0.07416114002096 , 0.03270293265285 , 0.03863816947328 ,
+0.04444276039114 , 0.0497985768307 , 0.05449897183339 ,
+0.05841301164775 , 0.06134989872289 , 0.06313835392955 ,
+0.06373119762273 , 0.06313835392955 , 0.06134989872289 ,
+0.05841301164775 , 0.05449897183339 , 0.0497985768307 ,
+0.04444276039114 , 0.03863816947328 , 0.03270293265285 ,
+0.07416114002096
+};
 
 //Data Variables decleration
 float temperature;
@@ -84,6 +98,8 @@ osThreadId aThread; //Accelerometer thread ID
 *@retval An int
 */
 int main (void) {	
+
+	#if !DEBUG
 	//Create necessary semaphores
 	tempId = osSemaphoreCreate(osSemaphore(temperature), 1);
 	accId = osSemaphoreCreate(osSemaphore(accCorrectedValues), 1);
@@ -101,6 +117,7 @@ int main (void) {
 	aThread = osThreadCreate(osThread(accelerometerThread), NULL);
 
 	displayUI(); //Main function
+	#endif
 }
 
 void temperatureThread(void const *argument){
@@ -147,6 +164,35 @@ void accelerometerThread(void const * argument){
 	movingAverageInit(&dataY);
 	movingAverageInit(&dataZ);
 	
+	//Create structures for FIR filter
+	#if MANUAL_FILTER
+	FIR_DATA dataXFIR;
+	FIR_DATA dataYFIR;
+	FIR_DATA dataZFIR;
+	
+	firInit(&dataXFIR);
+	firInit(&dataYFIR);
+	firInit(&dataZFIR);
+	#endif
+	
+	#if !MANUAL_FILTER
+	int16_t pCoeffs[19];
+	uint8_t decimantionFactor = 10;
+	uint16_t numTaps = 19;
+	q15_t pState[numTaps+10-1]; 
+	
+	arm_float_to_q15(&coeffPFloat[0], &pCoeffs[0], 19);
+	
+	arm_fir_decimate_instance_q15 q15InstanceX;
+	arm_fir_decimate_instance_q15 q15InstanceY;
+	arm_fir_decimate_instance_q15 q15InstanceZ;
+	
+	arm_fir_decimate_init_q15(&q15InstanceX, numTaps, decimantionFactor, &pCoeffs[0], &pState[0], 10);
+	arm_fir_decimate_init_q15(&q15InstanceY, numTaps, decimantionFactor, &pCoeffs[0], &pState[0], 10);
+	arm_fir_decimate_init_q15(&q15InstanceZ, numTaps, decimantionFactor, &pCoeffs[0], &pState[0], 10);
+
+	q15_t accXFixed[10], accYFixed[10], accZFixed[10];
+	#endif
 	GPIO_ResetBits(GPIOE, (uint16_t)0x0008); //Lower CS line
 	//stream0 is rx, stream3 is tx
 
@@ -192,14 +238,44 @@ void accelerometerThread(void const * argument){
             }		
 
             //Filter ACC values
-            
-            
             calibrateACC(accValues, accCorrectedValues); //Calibrate the accelerometer	
-            
+						
+						#if !LAB4
+            #if MANUAL_FILTER
+						if(fir(accCorrectedValues[0], &dataXFIR)){
+							arm_q15_to_float(&dataXFIR.result, &accCorrectedValues[0], 1);
+						}
+						if(fir(accCorrectedValues[1], &dataYFIR)){
+							arm_q15_to_float(&dataYFIR.result, &accCorrectedValues[1], 1);
+						}
+						if(fir(accCorrectedValues[2], &dataZFIR)){
+							arm_q15_to_float(&dataZFIR.result, &accCorrectedValues[2], 1);
+						}
+						#endif
+						
+						#if !MANUAL_FILTER
+						printf("old: %f", accCorrectedValues[0]);
+						accCorrectedValues[0] = accCorrectedValues[0] / 10000;
+						arm_float_to_q15(&accCorrectedValues[0], &accXFixed, 1);
+						arm_fir_decimate_q15(&q15InstanceX, &accXFixed, &accXFixed, 10);
+						arm_q15_to_float(&accXFixed, &accCorrectedValues[0], 1);
+						printf("new: %f", accCorrectedValues[0]);
+						accCorrectedValues[1] = accCorrectedValues[1] / 10000;
+						arm_float_to_q15(&accCorrectedValues[1], &accYFixed, 1);
+						
+						accCorrectedValues[2] = accCorrectedValues[2] / 10000;
+						arm_float_to_q15(&accCorrectedValues[2], &accZFixed, 1);
+						#endif
+						
+						#endif
+						
+						#if LAB4
             accCorrectedValues[0] = movingAverage(accCorrectedValues[0], &dataX);
             accCorrectedValues[1] = movingAverage(accCorrectedValues[1], &dataY);
             accCorrectedValues[2] = movingAverage(accCorrectedValues[2], &dataZ);
-            
+            #endif
+						
+						
             osSemaphoreRelease(accId); //Release exclusive access
             
             GPIO_ResetBits(GPIOE, (uint16_t)0x0008); //Lower CS line
