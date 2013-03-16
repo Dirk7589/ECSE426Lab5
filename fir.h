@@ -11,7 +11,7 @@
 
 /*Defines*/
 #define NUMBER_OF_SAMPLES 19 /**<The number of samples pass to the filter*/
-#define SCALE 10000
+#define FIR_SCALE 10000
 
 /**@struct FIR_DATA
 * A structure that holds all necessary values for the FIR filter
@@ -22,7 +22,7 @@ typedef struct{
 	int16_t values[NUMBER_OF_SAMPLES];
 	int16_t* lowestIndex;
 	int16_t result;
-	uint8_t count;
+	uint8_t counter;
 }FIR_DATA;
 
 /**

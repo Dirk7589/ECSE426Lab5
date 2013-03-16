@@ -28,11 +28,11 @@ float32_t coeffFloat[] = {
 *@retval The flag indicating a new output is ready, 1 indicates a sample is ready
 */
 uint8_t fir(float value, FIR_DATA* data){
-	value = value/SCALE;
+	value = value/FIR_SCALE;
 	int16_t valueFixed;
 	arm_float_to_q15(&value, &valueFixed, 1);
 	int16_t mult[NUMBER_OF_SAMPLES];
-	data->count++;
+	data->counter++;
 	int16_t* lowestPtr = data->lowestIndex;
 	
 	
@@ -43,7 +43,8 @@ uint8_t fir(float value, FIR_DATA* data){
 	*lowestPtr = valueFixed;
 	lowestPtr++;
 	
-	arm_mult_q15(&(q15_t)data->coeffFixed, &(q15_t)data->values, &mult, NUMBER_OF_SAMPLES);
+		arm_mult_q15(&data->coeffFixed[0], &data->values[0], &mult[0], NUMBER_OF_SAMPLES);
+	//arm_mult_q15(&data->coeffFixed, &data->values, &mult, NUMBER_OF_SAMPLES);
 	
 	for(int i = 0; i < NUMBER_OF_SAMPLES; i++){
 		data->result = data->result + mult[i];
@@ -73,6 +74,6 @@ void firInit(FIR_DATA* data){
 	}
 	data->result = 0;
 	data->lowestIndex = &data->values[0];
-	data->count = 0;
+	data->counter = 0;
 }
 
