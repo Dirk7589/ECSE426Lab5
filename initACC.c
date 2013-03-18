@@ -239,28 +239,32 @@ void displayBoardMovement(float* accCorrectedValues, float* previousValues, floa
 {	
 	float accelerationDiff[2] = {0,0};
 
+	//calculate the difference between the new and previous acceleration values
 	accelerationDiff[0] = accCorrectedValues[0] - previousValues[0];
 	accelerationDiff[1] = accCorrectedValues[1] - previousValues[1];
 	
+	//store the new values in previousValues to be used in the next iteration
 	previousValues[0] = accCorrectedValues[0];
 	previousValues[1] = accCorrectedValues[1];
 
+	//if the absolute value of the difference is above MOVEMENT_THRESHOLD then add the difference to accelerationTotals
 	if(accelerationDiff[0] > MOVEMENT_THRESHOLD || accelerationDiff[0] < -MOVEMENT_THRESHOLD){//&& absDiff0 < 500){
 		accelerationTotals[0] = accelerationTotals[0] + accelerationDiff[0];
 	}
-	
 	if(accelerationDiff[1] > MOVEMENT_THRESHOLD || accelerationDiff[1] < -MOVEMENT_THRESHOLD){//&& absDiff1 < 500){
 		accelerationTotals[1] = accelerationTotals[1] + accelerationDiff[1];
 	}
 	
+	//if the absolute value of accelerationTotals is smaller than MOVEMENT_THRESHOLD then reset accelerationTotals
 	if(accelerationTotals[0] < MOVEMENT_THRESHOLD && accelerationTotals[0] > -MOVEMENT_THRESHOLD){
 		accelerationTotals[0] = 0;
 	}
-	
 	if(accelerationTotals[1] < MOVEMENT_THRESHOLD && accelerationTotals[1] > -MOVEMENT_THRESHOLD){
 		accelerationTotals[1] = 0;
 	}
 	
+	//if the absolute value of accelerationTotals gets too large then reset it
+	//this prevents runaway
 	if(accelerationTotals[0] > 1000 || accelerationTotals[0] < -1000){
 		accelerationTotals[0] =0;
 	}
@@ -273,7 +277,7 @@ void displayBoardMovement(float* accCorrectedValues, float* previousValues, floa
 	printf("y-value: %f\n", accelerationTotals[1]); 
 	#endif
 	
-	
+	//check if accelerationTotals is above MOVEMENT_LED_THRESHOLD in each direction and set the LEDs accordingly
 	if(accelerationTotals[0] > MOVEMENT_LED_THRESHOLD){
 		GPIOD->BSRRL = BLUE_LED; //Moving in positive x direction
 	}
