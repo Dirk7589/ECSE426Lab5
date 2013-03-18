@@ -23,7 +23,7 @@
 /*Defines */
 #define DEBUG 0
 #define LAB4 0
-#define MANUAL_FILTER 1
+#define MANUAL_FILTER 0
 #define MAX_COUNTER_VALUE 5; //Maximum value for the temperature sensor to sample at 20Hz
 #define USER_BTN 0x0001 /*!<Defines the bit location of the user button*/
 
@@ -44,6 +44,7 @@ uint8_t const* txptr = &tx[0];
 uint8_t* rxptr = &rx[0];
 
 /*Global 3*/
+//Coefficients for the FIR filter
 float32_t coeffPFloat[] = {
 0.07416114002096 , 0.03270293265285 , 0.03863816947328 ,
 0.04444276039114 , 0.0497985768307 , 0.05449897183339 ,
@@ -55,7 +56,7 @@ float32_t coeffPFloat[] = {
 };
 
 //Data Variables decleration
-float temperature;
+float temperature; 
 float accCorrectedValues[3];
 float angles[2];
 int32_t accValues[3];
@@ -108,15 +109,15 @@ int main (void) {
 	initTempADC(); //Enable ADC for temp sensor
 	initTim3(); //Enable Tim3 at 100Hz
 	initACC(); //Enable the accelerometer
-	initDMAACC();
+	initDMAACC(); //Enable DMA for the accelerometer
 	initEXTIACC(); //Enable tap interrupts via exti0
 	initEXTIButton(); //Enable button interrupts via exti1
 	
-	// Start thread
+	// Start threads
 	tThread = osThreadCreate(osThread(temperatureThread), NULL);
 	aThread = osThreadCreate(osThread(accelerometerThread), NULL);
 
-	displayUI(); //Main function
+	displayUI(); //Main display function
 	#endif
 }
 
@@ -153,7 +154,9 @@ void temperatureThread(void const *argument){
 	
 
 void accelerometerThread(void const * argument){
-    
+  uint8_t i = 0; //Counting variables
+	uint8_t j = 0;
+	
 	//Create structures for moving average filter
 	AVERAGE_DATA_TYPEDEF dataX;
 	AVERAGE_DATA_TYPEDEF dataY;
@@ -175,23 +178,26 @@ void accelerometerThread(void const * argument){
 	firInit(&dataZFIR);
 	#endif
 	
+	//Create structures for automatic FIR filters
 	#if !MANUAL_FILTER
-	int16_t pCoeffs[19];
-	uint8_t decimantionFactor = 10;
-	uint16_t numTaps = 19;
-	q15_t pState[numTaps+10-1]; 
+	int16_t pCoeffs[19]; //Create coefficients array
+	uint8_t decimantionFactor = 10; //Set decimation to 10
+	uint16_t numTaps = 19; //The number of coefficients
+	q15_t pState[numTaps+10-1]; //Size of state variable
 	
-	arm_float_to_q15(&coeffPFloat[0], &pCoeffs[0], 19);
+	arm_float_to_q15(&coeffPFloat[0], &pCoeffs[0], 19); //Convert coefficients from float to q15
 	
-	arm_fir_decimate_instance_q15 q15InstanceX;
+	//Create instances for filters
+	arm_fir_decimate_instance_q15 q15InstanceX; 
 	arm_fir_decimate_instance_q15 q15InstanceY;
 	arm_fir_decimate_instance_q15 q15InstanceZ;
 	
+	//Initialize instaces for filters
 	arm_fir_decimate_init_q15(&q15InstanceX, numTaps, decimantionFactor, &pCoeffs[0], &pState[0], 10);
 	arm_fir_decimate_init_q15(&q15InstanceY, numTaps, decimantionFactor, &pCoeffs[0], &pState[0], 10);
 	arm_fir_decimate_init_q15(&q15InstanceZ, numTaps, decimantionFactor, &pCoeffs[0], &pState[0], 10);
 
-	q15_t accXFixed[10], accYFixed[10], accZFixed[10];
+	q15_t accXFixed[10], accYFixed[10], accZFixed[10]; // Buffers
 	#endif
 	GPIO_ResetBits(GPIOE, (uint16_t)0x0008); //Lower CS line
 	//stream0 is rx, stream3 is tx
@@ -227,7 +233,7 @@ void accelerometerThread(void const * argument){
         #if !DEBUG
 		if(dmaFlag){
 
-            uint8_t i;
+            
             osSemaphoreWait(accId, osWaitForever); //Have exclusive access to temperature
             int32_t* out = &accValues[0];
             //Scale the values from DMA to the actual values
@@ -243,30 +249,41 @@ void accelerometerThread(void const * argument){
 						#if !LAB4
             #if MANUAL_FILTER
 						if(fir(accCorrectedValues[0], &dataXFIR)){
-							arm_q15_to_float(&dataXFIR.result, &accCorrectedValues[0], 1);
+							arm_q15_to_float(&dataXFIR.result, &accCorrectedValues[0], 1); //Convert value back
 						}
 						if(fir(accCorrectedValues[1], &dataYFIR)){
-							arm_q15_to_float(&dataYFIR.result, &accCorrectedValues[1], 1);
+							arm_q15_to_float(&dataYFIR.result, &accCorrectedValues[1], 1); //Convert value back
 						}
 						if(fir(accCorrectedValues[2], &dataZFIR)){
-							arm_q15_to_float(&dataZFIR.result, &accCorrectedValues[2], 1);
+							arm_q15_to_float(&dataZFIR.result, &accCorrectedValues[2], 1); //Convert value back
 						}
 						#endif
 						
 						#if !MANUAL_FILTER
 						
-						accCorrectedValues[0] = accCorrectedValues[0] / 10000;
-						arm_float_to_q15(&accCorrectedValues[0], &accXFixed, 1);
-						arm_fir_decimate_q15(&q15InstanceX, &accXFixed, &accXFixed, 10);
-						arm_q15_to_float(&accXFixed, &accCorrectedValues[0], 1);
-						
+						accCorrectedValues[0] = accCorrectedValues[0] / 10000; //Scale down value
+						arm_float_to_q15(&accCorrectedValues[0], &accXFixed[j], 1); //Convert X values
 						accCorrectedValues[1] = accCorrectedValues[1] / 10000;
-						arm_float_to_q15(&accCorrectedValues[1], &accYFixed, 1);
-						
+						arm_float_to_q15(&accCorrectedValues[1], &accYFixed[j], 1); //Convert Y values
 						accCorrectedValues[2] = accCorrectedValues[2] / 10000;
-						arm_float_to_q15(&accCorrectedValues[2], &accZFixed, 1);
+						arm_float_to_q15(&accCorrectedValues[2], &accZFixed[j], 1); //Convert Z values
+						j++; //Increase buffer to next location
+						
+						if(j == 9){
+							arm_fir_decimate_q15(&q15InstanceX, &accXFixed[0], &accXFixed[0], 10); //Decimate
+							arm_fir_decimate_q15(&q15InstanceY, &accYFixed[0], &accYFixed[0], 10);
+							arm_fir_decimate_q15(&q15InstanceZ, &accZFixed[0], &accZFixed[0], 10);
+
+							arm_q15_to_float(&accXFixed[0], &accCorrectedValues[0], 1); //Convert
+							arm_q15_to_float(&accYFixed[0], &accCorrectedValues[1], 1);
+							arm_q15_to_float(&accZFixed[0], &accCorrectedValues[2], 1);
+							
+							j = 0;
+						}
 						#endif
+						
 						#endif
+						
             accCorrectedValues[0] = movingAverage(accCorrectedValues[0], &dataX);
             accCorrectedValues[1] = movingAverage(accCorrectedValues[1], &dataY);
             accCorrectedValues[2] = movingAverage(accCorrectedValues[2], &dataZ);
