@@ -284,27 +284,23 @@ void displayBoardMovement(float* accCorrectedValues, float* previousValues, floa
 	else{
 		GPIOD->BSRRH = BLUE_LED;
 	}
-	
 	if(accelerationTotals[0] < -MOVEMENT_LED_THRESHOLD){
 		GPIOD->BSRRL = ORANGE_LED; //Moving in negative x direction
 	}
 	else{
 		GPIOD->BSRRH = ORANGE_LED;
 	}
-	
 	if(accelerationTotals[1] > MOVEMENT_LED_THRESHOLD){
 		GPIOD->BSRRL = RED_LED; //Moving in positive y direction
 	}
 	else{
 		GPIOD->BSRRH = RED_LED;
 	}
-	
 	if(accelerationTotals[1] < -MOVEMENT_LED_THRESHOLD){
 		GPIOD->BSRRL = GREEN_LED; //Moving in negative y direction
 	}
 	else{
 		GPIOD->BSRRH = GREEN_LED;
 	}
-	
 }
 
