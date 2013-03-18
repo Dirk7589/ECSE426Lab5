@@ -22,8 +22,8 @@
 
 /*Defines */
 #define DEBUG 0
-#define LAB4 0
-#define MANUAL_FILTER 0
+#define LAB4 1
+#define MANUAL_FILTER 1
 #define MAX_COUNTER_VALUE 5; //Maximum value for the temperature sensor to sample at 20Hz
 #define USER_BTN 0x0001 /*!<Defines the bit location of the user button*/
 
@@ -261,6 +261,8 @@ void accelerometerThread(void const * argument){
 						
 						#if !MANUAL_FILTER
 						
+						printf("%f\n", accCorrectedValues[0]);
+						
 						accCorrectedValues[0] = accCorrectedValues[0] / 10000; //Scale down value
 						arm_float_to_q15(&accCorrectedValues[0], &accXFixed[j], 1); //Convert X values
 						accCorrectedValues[1] = accCorrectedValues[1] / 10000;
@@ -280,6 +282,10 @@ void accelerometerThread(void const * argument){
 							
 							j = 0;
 						}
+						accCorrectedValues[0] = accCorrectedValues[0] * 10000;
+						accCorrectedValues[1] = accCorrectedValues[1] * 10000;
+						accCorrectedValues[2] = accCorrectedValues[2] * 10000;
+						printf("%f\n", accCorrectedValues[0]);
 						#endif
 						
 						#endif
